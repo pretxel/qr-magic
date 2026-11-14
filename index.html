@@ -1,0 +1,1707 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qr-magic — Generador de códigos QR personalizados</title>
+<meta name="description" content="qr-magic: genera códigos QR personalizados con degradados, esquinas a medida, logo central y fondo transparente. Todo en tu navegador, sin registro.">
+<meta name="theme-color" content="#4f46e5">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%234f46e5'/%3E%3Cg fill='%23fff'%3E%3Crect x='6' y='6' width='8' height='8' rx='2'/%3E%3Crect x='18' y='6' width='8' height='8' rx='2'/%3E%3Crect x='6' y='18' width='8' height='8' rx='2'/%3E%3Crect x='18' y='18' width='3' height='3'/%3E%3Crect x='23' y='18' width='3' height='3'/%3E%3Crect x='18' y='23' width='3' height='3'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+
+<!-- ═══════════════ DEPENDENCIAS CDN ═══════════════ -->
+<script defer src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.9.2/lib/qr-code-styling.min.js"></script>
+
+<!-- ═══════════════ TOKENS DE DISEÑO (Tailwind v4) ═══════════════ -->
+<style type="text/tailwindcss">
+  /* El navegador de Tailwind v4 ya incluye preflight y utilidades:
+     no hace falta (ni conviene) importar "tailwindcss", porque el
+     import provocaría una petición de red adicional al resolverlo. */
+  @theme {
+    --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --color-brand-50:  #eef2ff;
+    --color-brand-100: #e0e7ff;
+    --color-brand-200: #c7d2fe;
+    --color-brand-300: #a5b4fc;
+    --color-brand-400: #818cf8;
+    --color-brand-500: #6366f1;
+    --color-brand-600: #4f46e5;
+    --color-brand-700: #4338ca;
+    --color-brand-800: #3730a3;
+    --color-brand-900: #312e81;
+
+    --color-grape-50:  #faf5ff;
+    --color-grape-100: #f3e8ff;
+    --color-grape-200: #e9d5ff;
+    --color-grape-400: #c084fc;
+    --color-grape-500: #a855f7;
+    --color-grape-600: #9333ea;
+    --color-grape-700: #7e22ce;
+
+    --radius-card: 1rem;
+    --radius-field: 0.625rem;
+  }
+</style>
+
+<!-- ═══════════════ CAPA DE COMPONENTES (CSS PROPIO) ═══════════════
+     Estas clases cubren el layout crítico y funcionan aunque Tailwind
+     no llegue a cargarse (sin conexión en la primera visita). -->
+<style>
+  :root {
+    --qm-bg:        #f8fafc;
+    --qm-surface:   #ffffff;
+    --qm-border:    #e2e8f0;
+    --qm-border-2:  #cbd5e1;
+    --qm-text:      #0f172a;
+    --qm-muted:     #64748b;
+    --qm-brand:     #4f46e5;
+    --qm-brand-2:   #7c3aed;
+    --qm-brand-soft:#eef2ff;
+    --qm-danger:    #dc2626;
+    --qm-warn:      #b45309;
+    --qm-ok:        #047857;
+    --qm-radius:    1rem;
+    --qm-shadow:    0 1px 2px rgba(15,23,42,.04), 0 10px 30px -18px rgba(15,23,42,.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  /* El atributo hidden siempre manda sobre las reglas de clase. */
+  [hidden] { display: none !important; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--qm-bg);
+    color: var(--qm-text);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .qm-shell { max-width: 1400px; margin: 0 auto; padding: 1.75rem 1rem 4rem; }
+  @media (min-width: 640px) { .qm-shell { padding: 2rem 1.5rem 5rem; } }
+  @media (min-width: 1024px) { .qm-shell { padding: 2.5rem 2rem 6rem; } }
+
+  .qm-layout { display: grid; gap: 1.5rem; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 1024px) {
+    .qm-layout { grid-template-columns: minmax(0, 1fr) 420px; gap: 1.75rem; }
+    .qm-preview-col { position: sticky; top: 1.5rem; }
+  }
+
+  .qm-col { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
+
+  /* ── Encabezado ─────────────────────────────────────────── */
+  .qm-brandmark {
+    width: 2.75rem; height: 2.75rem; border-radius: .875rem;
+    display: grid; place-items: center; flex: none;
+    background: linear-gradient(135deg, var(--qm-brand) 0%, var(--qm-brand-2) 100%);
+    color: #fff; font-weight: 700; font-size: .8rem; letter-spacing: .02em;
+    box-shadow: 0 8px 20px -10px rgba(79,70,229,.9);
+  }
+  .qm-title { margin: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; }
+  .qm-subtitle { margin: 0; font-size: .875rem; color: var(--qm-muted); }
+
+  /* ── Tarjetas ───────────────────────────────────────────── */
+  .qm-card {
+    background: var(--qm-surface);
+    border: 1px solid var(--qm-border);
+    border-radius: var(--qm-radius);
+    box-shadow: var(--qm-shadow);
+    padding: 1.25rem;
+  }
+  @media (min-width: 640px) { .qm-card { padding: 1.5rem; } }
+  .qm-card__title {
+    margin: 0 0 1rem; font-size: .9375rem; font-weight: 650;
+    letter-spacing: -.01em; display: flex; align-items: center; gap: .5rem;
+  }
+  .qm-card__hint { margin: -.5rem 0 1rem; font-size: .8125rem; color: var(--qm-muted); }
+  .qm-section-title {
+    margin: 1.25rem 0 .75rem; font-size: .75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .07em; color: var(--qm-muted);
+  }
+  .qm-section-title:first-child { margin-top: 0; }
+
+  /* ── Pestañas ────────────────────────────────────────────── */
+  .qm-tabs {
+    display: flex; gap: .25rem; overflow-x: auto; padding-bottom: .25rem;
+    border-bottom: 1px solid var(--qm-border); margin-bottom: 1.25rem;
+  }
+  .qm-tab {
+    appearance: none; border: 0; background: transparent; cursor: pointer;
+    font: inherit; font-size: .8125rem; font-weight: 600; white-space: nowrap;
+    color: var(--qm-muted); padding: .55rem .8rem; border-radius: .5rem;
+    margin-bottom: -.25rem; border-bottom: 2px solid transparent;
+    transition: color .15s ease, background-color .15s ease;
+  }
+  .qm-tab:hover { color: var(--qm-text); background: #f1f5f9; }
+  .qm-tab[aria-selected="true"] {
+    color: var(--qm-brand); background: var(--qm-brand-soft);
+    border-bottom-color: var(--qm-brand);
+  }
+  .qm-tab:focus-visible, .qm-btn:focus-visible, .qm-input:focus-visible,
+  .qm-select:focus-visible, .qm-preset:focus-visible, .qm-iconbtn:focus-visible,
+  .qm-chip:focus-visible {
+    outline: 2px solid var(--qm-brand); outline-offset: 2px;
+  }
+
+  /* ── Campos ──────────────────────────────────────────────── */
+  .qm-field { margin-bottom: 1rem; }
+  .qm-field:last-child { margin-bottom: 0; }
+  .qm-label {
+    display: block; font-size: .8125rem; font-weight: 600; margin-bottom: .375rem;
+    color: #334155;
+  }
+  .qm-input, .qm-select, .qm-textarea {
+    width: 100%; font: inherit; font-size: .875rem; color: var(--qm-text);
+    background: #fff; border: 1px solid var(--qm-border-2); border-radius: .625rem;
+    padding: .55rem .75rem; transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .qm-input:hover, .qm-select:hover { border-color: #94a3b8; }
+  .qm-input:focus, .qm-select:focus, .qm-textarea:focus {
+    outline: none; border-color: var(--qm-brand);
+    box-shadow: 0 0 0 3px rgba(79,70,229,.16);
+  }
+  .qm-input[aria-invalid="true"], .qm-select[aria-invalid="true"] {
+    border-color: var(--qm-danger);
+  }
+  .qm-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px rgba(220,38,38,.16);
+  }
+  .qm-input::placeholder { color: #94a3b8; }
+  .qm-textarea { resize: vertical; min-height: 5rem; }
+  .qm-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right .6rem center; background-size: 1rem;
+    padding-right: 2rem;
+  }
+  .qm-hint { margin: .375rem 0 0; font-size: .75rem; color: var(--qm-muted); }
+  .qm-error {
+    margin: .375rem 0 0; font-size: .75rem; color: var(--qm-danger); font-weight: 500;
+  }
+  .qm-error::before { content: "⚠ "; }
+
+  .qm-row { display: flex; gap: .75rem; flex-wrap: wrap; }
+  .qm-row > * { flex: 1 1 10rem; min-width: 0; }
+
+  /* ── Selector de color ───────────────────────────────────── */
+  .qm-color {
+    width: 100%; height: 2.6rem; padding: .2rem; cursor: pointer;
+    background: #fff; border: 1px solid var(--qm-border-2); border-radius: .625rem;
+  }
+  .qm-color:disabled { opacity: .45; cursor: not-allowed; }
+  .qm-color:focus-visible { outline: 2px solid var(--qm-brand); outline-offset: 2px; }
+
+  /* ── Deslizadores ────────────────────────────────────────── */
+  .qm-range { width: 100%; accent-color: var(--qm-brand); height: 1.5rem; cursor: pointer; }
+  .qm-range:focus-visible { outline: 2px solid var(--qm-brand); outline-offset: 4px; }
+  .qm-range-value {
+    font-variant-numeric: tabular-nums; font-size: .75rem; font-weight: 650;
+    color: var(--qm-brand); background: var(--qm-brand-soft);
+    padding: .1rem .45rem; border-radius: .375rem;
+  }
+
+  /* ── Interruptor ─────────────────────────────────────────── */
+  .qm-switch { display: inline-flex; align-items: center; gap: .625rem; cursor: pointer; }
+  .qm-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .qm-switch__track {
+    width: 2.5rem; height: 1.375rem; border-radius: 999px; background: #cbd5e1;
+    position: relative; transition: background-color .18s ease; flex: none;
+  }
+  .qm-switch__track::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 1.125rem; height: 1.125rem;
+    border-radius: 999px; background: #fff; box-shadow: 0 1px 3px rgba(15,23,42,.3);
+    transition: transform .18s ease;
+  }
+  .qm-switch input:checked + .qm-switch__track { background: var(--qm-brand); }
+  .qm-switch input:checked + .qm-switch__track::after { transform: translateX(1.125rem); }
+  .qm-switch input:focus-visible + .qm-switch__track { outline: 2px solid var(--qm-brand); outline-offset: 2px; }
+  .qm-switch__label { font-size: .8125rem; font-weight: 600; }
+
+  /* ── Segmentos (Sólido / Degradado) ──────────────────────── */
+  .qm-segments {
+    display: inline-flex; padding: .2rem; gap: .2rem; background: #f1f5f9;
+    border-radius: .625rem; margin-bottom: .875rem;
+  }
+  .qm-segments label {
+    font-size: .75rem; font-weight: 650; padding: .35rem .75rem; border-radius: .45rem;
+    cursor: pointer; color: var(--qm-muted); transition: all .15s ease;
+  }
+  .qm-segments input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .qm-segments input:checked + span { background: #fff; color: var(--qm-brand); box-shadow: 0 1px 2px rgba(15,23,42,.12); }
+  .qm-segments label:hover span { color: var(--qm-text); }
+  .qm-segments input:focus-visible + span { outline: 2px solid var(--qm-brand); outline-offset: 1px; }
+  .qm-segments span { display: block; border-radius: .45rem; padding: .35rem .75rem; }
+
+  /* ── Botones ─────────────────────────────────────────────── */
+  .qm-btn {
+    appearance: none; cursor: pointer; font: inherit; font-size: .8125rem; font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+    padding: .55rem .9rem; border-radius: .625rem; border: 1px solid var(--qm-border-2);
+    background: #fff; color: #334155; transition: all .15s ease;
+  }
+  .qm-btn:hover:not(:disabled) { background: #f8fafc; border-color: #94a3b8; color: var(--qm-text); }
+  .qm-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .qm-btn--primary {
+    background: linear-gradient(135deg, var(--qm-brand) 0%, var(--qm-brand-2) 100%);
+    border-color: transparent; color: #fff;
+    box-shadow: 0 8px 18px -10px rgba(79,70,229,.95);
+  }
+  .qm-btn--primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+    color: #fff; border-color: transparent;
+  }
+  .qm-btn--block { width: 100%; }
+  .qm-btn--sm { padding: .4rem .7rem; font-size: .75rem; }
+
+  /* ── Presets ─────────────────────────────────────────────── */
+  .qm-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .625rem; }
+  .qm-preset {
+    appearance: none; cursor: pointer; font: inherit; text-align: left;
+    border: 1px solid var(--qm-border); background: #fff; border-radius: .75rem;
+    padding: .625rem; transition: all .15s ease;
+  }
+  .qm-preset:hover { border-color: var(--qm-brand); box-shadow: 0 6px 16px -10px rgba(79,70,229,.6); transform: translateY(-1px); }
+  .qm-preset__name { display: block; font-size: .75rem; font-weight: 650; color: var(--qm-text); }
+  .qm-preset__desc { display: block; font-size: .6875rem; color: var(--qm-muted); margin-top: .125rem; }
+  .qm-preset__swatch {
+    display: block; height: 1.5rem; border-radius: .375rem; margin-bottom: .5rem;
+    border: 1px solid rgba(15,23,42,.08);
+  }
+
+  /* ── Galería de iconos ───────────────────────────────────── */
+  .qm-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr)); gap: .5rem; }
+  .qm-iconbtn {
+    appearance: none; cursor: pointer; aspect-ratio: 1 / 1; padding: .4rem;
+    border: 1px solid var(--qm-border); background: #fff; border-radius: .625rem;
+    display: grid; place-items: center; transition: all .15s ease;
+  }
+  .qm-iconbtn:hover { border-color: var(--qm-brand); background: var(--qm-brand-soft); }
+  .qm-iconbtn[aria-pressed="true"] {
+    border-color: var(--qm-brand); background: var(--qm-brand-soft);
+    box-shadow: 0 0 0 2px rgba(79,70,229,.25);
+  }
+  .qm-iconbtn svg { width: 100%; height: 100%; }
+
+  /* ── Zona de arrastrar y soltar ──────────────────────────── */
+  .qm-dropzone {
+    border: 2px dashed var(--qm-border-2); border-radius: .875rem; background: #fbfdff;
+    padding: 1.25rem; text-align: center; cursor: pointer; transition: all .15s ease;
+  }
+  .qm-dropzone:hover { border-color: var(--qm-brand); background: var(--qm-brand-soft); }
+  .qm-dropzone--over { border-color: var(--qm-brand); background: var(--qm-brand-soft); transform: scale(1.01); }
+  .qm-dropzone__title { font-size: .8125rem; font-weight: 650; margin: 0; }
+  .qm-dropzone__hint { font-size: .6875rem; color: var(--qm-muted); margin: .25rem 0 0; }
+
+  /* ── Vista previa ────────────────────────────────────────── */
+  .qm-preview-stage {
+    border-radius: .875rem; padding: 1.25rem; display: grid; place-items: center;
+    background-color: #eef2f7;
+    background-image:
+      linear-gradient(rgba(15,23,42,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15,23,42,.07) 1px, transparent 1px);
+    background-size: 18px 18px;
+    min-height: 20rem;
+  }
+  .qm-preview-canvas { width: 100%; max-width: 20rem; aspect-ratio: 1 / 1; display: grid; place-items: center; }
+  .qm-preview-canvas svg, .qm-preview-canvas canvas { width: 100%; height: 100%; display: block; border-radius: .5rem; }
+  .qm-empty {
+    text-align: center; color: var(--qm-muted); font-size: .8125rem;
+    padding: 2rem 1rem; max-width: 17rem;
+  }
+  .qm-empty__icon { font-size: 2rem; line-height: 1; margin-bottom: .5rem; }
+
+  .qm-preview-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: 1rem; flex-wrap: wrap; }
+  .qm-badge {
+    display: inline-flex; align-items: center; gap: .375rem; font-size: .75rem; font-weight: 650;
+    padding: .25rem .6rem; border-radius: 999px; border: 1px solid transparent;
+  }
+  .qm-badge--ok     { color: var(--qm-ok);     background: #ecfdf5; border-color: #a7f3d0; }
+  .qm-badge--warn   { color: var(--qm-warn);   background: #fffbeb; border-color: #fde68a; }
+  .qm-badge--error  { color: var(--qm-danger); background: #fef2f2; border-color: #fecaca; }
+  .qm-badge--muted  { color: var(--qm-muted);  background: #f1f5f9; border-color: var(--qm-border); }
+  .qm-ratio { font-variant-numeric: tabular-nums; font-size: .75rem; color: var(--qm-muted); font-weight: 600; }
+
+  /* ── Alertas ─────────────────────────────────────────────── */
+  .qm-alert {
+    display: flex; gap: .625rem; align-items: flex-start; font-size: .8125rem;
+    padding: .75rem .875rem; border-radius: .75rem; border: 1px solid; margin-top: 1rem;
+  }
+  .qm-alert__icon { flex: none; font-size: 1rem; line-height: 1.3; }
+  .qm-alert--warn  { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+  .qm-alert--error { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+  .qm-alert--info  { color: #1e3a8a; background: #eff6ff; border-color: #bfdbfe; }
+  .qm-alert strong { font-weight: 700; }
+  .qm-alert p { margin: 0; }
+
+  /* ── Volcado del payload ─────────────────────────────────── */
+  .qm-payload {
+    margin: 1rem 0 0; padding: .75rem; border-radius: .75rem; background: #0f172a;
+    color: #e2e8f0; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .6875rem; line-height: 1.45; max-height: 8.5rem; overflow: auto;
+    white-space: pre-wrap; word-break: break-all; border: 1px solid #1e293b;
+  }
+
+  /* ── Exportación ─────────────────────────────────────────── */
+  .qm-export-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-top: .75rem; }
+  .qm-export-grid .qm-btn--block { grid-column: 1 / -1; }
+
+  /* ── Logo activo ─────────────────────────────────────────── */
+  .qm-logo-row { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+  .qm-logo-thumb {
+    width: 3rem; height: 3rem; border-radius: .625rem; border: 1px solid var(--qm-border);
+    background: #fff; display: grid; place-items: center; overflow: hidden; flex: none;
+  }
+  .qm-logo-thumb img, .qm-logo-thumb svg { max-width: 80%; max-height: 80%; display: block; }
+  .qm-logo-meta { min-width: 0; flex: 1; }
+  .qm-logo-name { font-size: .8125rem; font-weight: 650; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qm-logo-kind { font-size: .6875rem; color: var(--qm-muted); margin: 0; }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+  .qm-toasts {
+    position: fixed; z-index: 50; bottom: 1rem; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: .5rem; width: min(26rem, calc(100vw - 2rem));
+  }
+  .qm-toast {
+    background: #0f172a; color: #f8fafc; font-size: .8125rem; font-weight: 500;
+    padding: .75rem 1rem; border-radius: .75rem; box-shadow: 0 20px 40px -20px rgba(15,23,42,.8);
+    display: flex; gap: .5rem; align-items: flex-start; animation: qm-in .2s ease;
+  }
+  .qm-toast--error { background: #7f1d1d; }
+  .qm-toast--ok { background: #065f46; }
+  @keyframes qm-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .qm-visually-hidden {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .qm-divider { height: 1px; background: var(--qm-border); margin: 1.25rem 0; border: 0; }
+</style>
+</head>
+
+<body>
+<div class="qm-shell">
+
+  <!-- ═══════════════ ENCABEZADO ═══════════════ -->
+  <header class="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="qm-brandmark" aria-hidden="true">QR</div>
+      <div>
+        <h1 class="qm-title">qr-magic</h1>
+        <p class="qm-subtitle">Generador de códigos QR personalizados. Todo ocurre en tu navegador.</p>
+      </div>
+    </div>
+    <span class="qm-badge qm-badge--muted">100 % local · sin registro · sin servidor</span>
+  </header>
+
+  <!-- Aviso: la librería no está disponible -->
+  <div id="library-error" class="qm-alert qm-alert--error" hidden style="margin-bottom:1.5rem">
+    <span class="qm-alert__icon" aria-hidden="true">⚠</span>
+    <p><strong>No se pudo cargar la librería generadora de QR.</strong> qr-magic necesita conexión a Internet
+      la primera vez para descargar <code>qr-code-styling</code> desde el CDN. Vuelve a abrir la página con
+      conexión y todo funcionará con normalidad.</p>
+  </div>
+
+  <main class="qm-layout">
+
+    <!-- ═══════════════ COLUMNA IZQUIERDA · CONTROLES ═══════════════ -->
+    <div class="qm-col">
+
+      <!-- ── Contenido ─────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-contenido">
+        <h2 class="qm-card__title" id="h-contenido">Contenido del código</h2>
+        <p class="qm-card__hint">Elige el tipo de información que quieres codificar en qr-magic.</p>
+
+        <div class="qm-tabs" role="tablist" aria-label="Tipo de contenido">
+          <button class="qm-tab" type="button" role="tab" id="tab-url" data-tab="url"
+                  aria-controls="panel-url" aria-selected="true">URL / Texto</button>
+          <button class="qm-tab" type="button" role="tab" id="tab-wifi" data-tab="wifi"
+                  aria-controls="panel-wifi" aria-selected="false" tabindex="-1">Wi-Fi</button>
+          <button class="qm-tab" type="button" role="tab" id="tab-vcard" data-tab="vcard"
+                  aria-controls="panel-vcard" aria-selected="false" tabindex="-1">vCard (Contacto)</button>
+          <button class="qm-tab" type="button" role="tab" id="tab-email" data-tab="email"
+                  aria-controls="panel-email" aria-selected="false" tabindex="-1">Email</button>
+        </div>
+
+        <!-- Panel URL / Texto -->
+        <div id="panel-url" role="tabpanel" aria-labelledby="tab-url" data-panel="url">
+          <div class="qm-field">
+            <label class="qm-label" for="url-text">Enlace o texto</label>
+            <input class="qm-input" id="url-text" type="text" data-bind="content.url.text"
+                   value="https://qr-magic.app" placeholder="https://qr-magic.app o cualquier texto"
+                   autocomplete="off" aria-describedby="url-text-error">
+            <p class="qm-error" id="url-text-error" hidden></p>
+            <p class="qm-hint">Ejemplos: <code>https://qr-magic.app</code>, un teléfono, un mensaje…</p>
+          </div>
+        </div>
+
+        <!-- Panel Wi-Fi -->
+        <div id="panel-wifi" role="tabpanel" aria-labelledby="tab-wifi" data-panel="wifi" hidden>
+          <div class="qm-field">
+            <label class="qm-label" for="wifi-ssid">Nombre de la red (SSID)</label>
+            <input class="qm-input" id="wifi-ssid" type="text" data-bind="content.wifi.ssid"
+                   placeholder="Mi red Wi-Fi" autocomplete="off" aria-describedby="wifi-ssid-error">
+            <p class="qm-error" id="wifi-ssid-error" hidden></p>
+          </div>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="wifi-password">Contraseña</label>
+              <input class="qm-input" id="wifi-password" type="text" data-bind="content.wifi.password"
+                     placeholder="Obligatoria para redes protegidas" autocomplete="off" aria-describedby="wifi-password-error">
+              <p class="qm-error" id="wifi-password-error" hidden></p>
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="wifi-encryption">Seguridad</label>
+              <select class="qm-select" id="wifi-encryption" data-bind="content.wifi.encryption">
+                <option value="WPA">WPA/WPA2</option>
+                <option value="WEP">WEP</option>
+                <option value="nopass">Ninguna</option>
+              </select>
+            </div>
+          </div>
+          <label class="qm-switch">
+            <input type="checkbox" id="wifi-hidden" data-bind="content.wifi.hidden">
+            <span class="qm-switch__track" aria-hidden="true"></span>
+            <span class="qm-switch__label">Red oculta</span>
+          </label>
+        </div>
+
+        <!-- Panel vCard -->
+        <div id="panel-vcard" role="tabpanel" aria-labelledby="tab-vcard" data-panel="vcard" hidden>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-first">Nombre</label>
+              <input class="qm-input" id="vcard-first" type="text" data-bind="content.vcard.firstName"
+                     placeholder="Ana" autocomplete="off" aria-describedby="vcard-first-error">
+              <p class="qm-error" id="vcard-first-error" hidden></p>
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-last">Apellidos</label>
+              <input class="qm-input" id="vcard-last" type="text" data-bind="content.vcard.lastName"
+                     placeholder="García" autocomplete="off">
+            </div>
+          </div>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-phone">Teléfono</label>
+              <input class="qm-input" id="vcard-phone" type="tel" data-bind="content.vcard.phone"
+                     placeholder="+34 600 00 00 00" autocomplete="off">
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-email">Correo electrónico</label>
+              <input class="qm-input" id="vcard-email" type="email" data-bind="content.vcard.email"
+                     placeholder="ana@example.com" autocomplete="off">
+            </div>
+          </div>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-org">Empresa</label>
+              <input class="qm-input" id="vcard-org" type="text" data-bind="content.vcard.org"
+                     placeholder="Acme S.L." autocomplete="off">
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="vcard-title">Cargo</label>
+              <input class="qm-input" id="vcard-title" type="text" data-bind="content.vcard.title"
+                     placeholder="Directora" autocomplete="off">
+            </div>
+          </div>
+          <div class="qm-field">
+            <label class="qm-label" for="vcard-url">Sitio web</label>
+            <input class="qm-input" id="vcard-url" type="url" data-bind="content.vcard.website"
+                   placeholder="https://qr-magic.app" autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Panel Email -->
+        <div id="panel-email" role="tabpanel" aria-labelledby="tab-email" data-panel="email" hidden>
+          <div class="qm-field">
+            <label class="qm-label" for="email-to">Destinatario</label>
+            <input class="qm-input" id="email-to" type="email" data-bind="content.email.to"
+                   placeholder="hola@example.com" autocomplete="off" aria-describedby="email-to-error">
+            <p class="qm-error" id="email-to-error" hidden></p>
+          </div>
+          <div class="qm-field">
+            <label class="qm-label" for="email-subject">Asunto</label>
+            <input class="qm-input" id="email-subject" type="text" data-bind="content.email.subject"
+                   placeholder="Presupuesto" autocomplete="off">
+          </div>
+          <div class="qm-field">
+            <label class="qm-label" for="email-body">Mensaje</label>
+            <textarea class="qm-textarea" id="email-body" data-bind="content.email.body"
+                      placeholder="Escribe aquí el cuerpo del mensaje…"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Presets ────────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-presets">
+        <h2 class="qm-card__title" id="h-presets">Plantillas rápidas</h2>
+        <p class="qm-card__hint">Aplica un estilo completo con un solo clic. Puedes ajustarlo después.</p>
+        <div class="qm-presets" id="presets"></div>
+      </section>
+
+      <!-- ── Estilo de los puntos ───────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-dots">
+        <h2 class="qm-card__title" id="h-dots">Estilo de los puntos</h2>
+
+        <h3 class="qm-section-title">Forma del módulo</h3>
+        <div class="qm-field">
+          <label class="qm-label" for="dots-type">Forma</label>
+          <select class="qm-select" id="dots-type" data-bind="dots.type">
+            <option value="square">Cuadrada</option>
+            <option value="dots">Círculos</option>
+            <option value="rounded">Redondeada</option>
+            <option value="extra-rounded">Muy redondeada</option>
+            <option value="classy">Clásica</option>
+            <option value="classy-rounded">Clásica redondeada</option>
+          </select>
+        </div>
+
+        <h3 class="qm-section-title">Color de los puntos</h3>
+        <div class="qm-segments" role="radiogroup" aria-label="Modo de color de los puntos">
+          <label>
+            <input type="radio" name="dots-mode" value="solid" data-bind="dots.mode" checked>
+            <span>Sólido</span>
+          </label>
+          <label>
+            <input type="radio" name="dots-mode" value="gradient" data-bind="dots.mode">
+            <span>Degradado</span>
+          </label>
+        </div>
+
+        <div id="dots-solid-block">
+          <div class="qm-field">
+            <label class="qm-label" for="dots-color">Color</label>
+            <input class="qm-color" id="dots-color" type="color" data-bind="dots.color" value="#4f46e5">
+          </div>
+        </div>
+
+        <div id="dots-gradient-block" hidden>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="dots-color-1">Color 1</label>
+              <input class="qm-color" id="dots-color-1" type="color" data-bind="dots.color1" value="#4f46e5">
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="dots-color-2">Color 2</label>
+              <input class="qm-color" id="dots-color-2" type="color" data-bind="dots.color2" value="#a855f7">
+            </div>
+          </div>
+          <div class="qm-row">
+            <div class="qm-field">
+              <label class="qm-label" for="dots-gradient-type">Tipo de degradado</label>
+              <select class="qm-select" id="dots-gradient-type" data-bind="dots.gradientType">
+                <option value="linear">Lineal</option>
+                <option value="radial">Radial</option>
+              </select>
+            </div>
+            <div class="qm-field">
+              <label class="qm-label" for="dots-angle">
+                Ángulo <span class="qm-range-value" id="dots-angle-value">45°</span>
+              </label>
+              <input class="qm-range" id="dots-angle" type="range" min="0" max="360" step="1"
+                     data-bind="dots.angle" data-type="number" value="45">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Esquinas ───────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-corners">
+        <h2 class="qm-card__title" id="h-corners">Esquinas del QR</h2>
+        <p class="qm-card__hint">Configura el marco exterior y el punto interior por separado.</p>
+
+        <h3 class="qm-section-title">Marco exterior</h3>
+        <div class="qm-row">
+          <div class="qm-field">
+            <label class="qm-label" for="corner-frame-type">Forma</label>
+            <select class="qm-select" id="corner-frame-type" data-bind="cornersSquare.type">
+              <option value="square">Cuadrada</option>
+              <option value="extra-rounded">Muy redondeada</option>
+              <option value="dot">Círculo</option>
+            </select>
+          </div>
+          <div class="qm-field">
+            <label class="qm-label" for="corner-frame-color">Color</label>
+            <input class="qm-color" id="corner-frame-color" type="color" data-bind="cornersSquare.color" value="#4f46e5">
+          </div>
+        </div>
+
+        <h3 class="qm-section-title">Punto interior</h3>
+        <div class="qm-row">
+          <div class="qm-field">
+            <label class="qm-label" for="corner-dot-type">Forma</label>
+            <select class="qm-select" id="corner-dot-type" data-bind="cornersDot.type">
+              <option value="square">Cuadrada</option>
+              <option value="dot">Círculo</option>
+            </select>
+          </div>
+          <div class="qm-field">
+            <label class="qm-label" for="corner-dot-color">Color</label>
+            <input class="qm-color" id="corner-dot-color" type="color" data-bind="cornersDot.color" value="#a855f7">
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Fondo ───────────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-bg">
+        <h2 class="qm-card__title" id="h-bg">Fondo</h2>
+        <div class="qm-field">
+          <label class="qm-label" for="bg-color">Color de fondo</label>
+          <input class="qm-color" id="bg-color" type="color" data-bind="background.color" value="#ffffff">
+        </div>
+        <label class="qm-switch">
+          <input type="checkbox" id="bg-transparent" data-bind="background.transparent">
+          <span class="qm-switch__track" aria-hidden="true"></span>
+          <span class="qm-switch__label">Fondo transparente</span>
+        </label>
+        <p class="qm-hint">Al activar el fondo transparente se usa blanco como referencia para el cálculo de contraste.</p>
+      </section>
+
+      <!-- ── Logo ────────────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-logo">
+        <h2 class="qm-card__title" id="h-logo">Logo central</h2>
+
+        <div class="qm-logo-row" id="logo-active" hidden>
+          <div class="qm-logo-thumb" id="logo-thumb"></div>
+          <div class="qm-logo-meta">
+            <p class="qm-logo-name" id="logo-name">—</p>
+            <p class="qm-logo-kind" id="logo-kind">—</p>
+          </div>
+          <button class="qm-btn qm-btn--sm" type="button" id="logo-remove">Quitar</button>
+        </div>
+
+        <div class="qm-field">
+          <div class="qm-dropzone" id="dropzone" role="button" tabindex="0"
+               aria-label="Subir un logo: pulsa para elegir un fichero o arrástralo aquí">
+            <p class="qm-dropzone__title">Arrastra tu logo aquí o pulsa para elegirlo</p>
+            <p class="qm-dropzone__hint">PNG, JPG o SVG · máximo 2 MB</p>
+          </div>
+          <input type="file" id="logo-file" accept="image/png,image/jpeg,image/svg+xml" hidden>
+          <p class="qm-error" id="logo-error" role="alert" hidden></p>
+        </div>
+
+        <div class="qm-field">
+          <label class="qm-label" for="logo-size">
+            Tamaño del logo <span class="qm-range-value" id="logo-size-value">25 %</span>
+          </label>
+          <input class="qm-range" id="logo-size" type="range" min="10" max="40" step="1"
+                 data-bind="logo.sizePercent" data-type="number" value="25">
+        </div>
+
+        <div class="qm-field">
+          <label class="qm-label" for="logo-margin">
+            Margen alrededor <span class="qm-range-value" id="logo-margin-value">0 px</span>
+          </label>
+          <input class="qm-range" id="logo-margin" type="range" min="0" max="20" step="1"
+                 data-bind="logo.margin" data-type="number" value="0">
+        </div>
+
+        <div class="qm-field">
+          <label class="qm-label" for="logo-ec">Corrección de errores</label>
+          <select class="qm-select" id="logo-ec" data-bind="logo.errorCorrection">
+            <option value="L">L · 7 %</option>
+            <option value="M">M · 15 %</option>
+            <option value="Q">Q · 25 %</option>
+            <option value="H">H · 30 %</option>
+          </select>
+          <p class="qm-hint">El nivel H aguanta hasta un 30 % del QR tapado por el logo.</p>
+        </div>
+
+        <div class="qm-alert qm-alert--warn" id="logo-ec-warning" hidden>
+          <span class="qm-alert__icon" aria-hidden="true">⚠</span>
+          <p><strong>Contraste de errores bajo.</strong> Con un logo centrado, los niveles L y M pueden hacer
+            que el código deje de leerse. Recomendamos usar <strong>H</strong>.</p>
+        </div>
+      </section>
+
+      <!-- ── Iconos ──────────────────────────────────────────── -->
+      <section class="qm-card" aria-labelledby="h-icons">
+        <h2 class="qm-card__title" id="h-icons">Iconos listos para usar</h2>
+        <p class="qm-card__hint">Elige un icono para usarlo como logo central de qr-magic.</p>
+        <div class="qm-icons" id="icon-gallery"></div>
+      </section>
+
+    </div>
+
+    <!-- ═══════════════ COLUMNA DERECHA · VISTA PREVIA ═══════════════ -->
+    <div class="qm-col qm-preview-col">
+
+      <section class="qm-card" aria-labelledby="h-preview">
+        <h2 class="qm-card__title" id="h-preview">Vista previa</h2>
+
+        <div class="qm-preview-stage">
+          <div class="qm-preview-canvas" id="qr-preview" role="img"
+               aria-label="Vista previa del código QR generado por qr-magic"></div>
+        </div>
+
+        <div class="qm-preview-bar">
+          <span class="qm-badge qm-badge--muted" id="contrast-badge">Sin datos</span>
+          <span class="qm-ratio" id="contrast-ratio"></span>
+        </div>
+
+        <div class="qm-alert qm-alert--warn" id="contrast-warning" hidden>
+          <span class="qm-alert__icon" aria-hidden="true">⚠</span>
+          <p><strong>Contraste bajo.</strong> La medición es orientativa y no garantiza la escaneabilidad.
+            Oscurece los módulos o aclara el fondo para aumentar el contraste.</p>
+        </div>
+
+        <div class="qm-alert qm-alert--info" id="transparent-hint" hidden>
+          <span class="qm-alert__icon" aria-hidden="true">ℹ</span>
+          <p>El fondo es transparente: el contraste se ha calculado sobre blanco. El resultado real dependerá
+            del soporte donde imprimas o muestres el QR.</p>
+        </div>
+
+        <div class="qm-alert qm-alert--error" id="render-error" hidden>
+          <span class="qm-alert__icon" aria-hidden="true">⚠</span>
+          <p id="render-error-text"></p>
+        </div>
+
+        <pre class="qm-payload" id="payload-dump" aria-label="Contenido exacto codificado en el QR"></pre>
+      </section>
+
+      <section class="qm-card" aria-labelledby="h-export">
+        <h2 class="qm-card__title" id="h-export">Exportar</h2>
+        <div class="qm-field">
+          <label class="qm-label" for="export-size">Resolución</label>
+          <select class="qm-select" id="export-size" data-bind="export.size" data-type="number">
+            <option value="300">300 × 300 px</option>
+            <option value="500">500 × 500 px</option>
+            <option value="800">800 × 800 px</option>
+            <option value="1000" selected>1000 × 1000 px</option>
+            <option value="1500">1500 × 1500 px</option>
+            <option value="2000">2000 × 2000 px</option>
+          </select>
+        </div>
+        <div class="qm-export-grid">
+          <button class="qm-btn qm-btn--primary" type="button" id="download-png">Descargar PNG</button>
+          <button class="qm-btn" type="button" id="download-svg">Descargar SVG</button>
+          <button class="qm-btn qm-btn--block" type="button" id="download-jpeg">Descargar JPEG</button>
+          <button class="qm-btn qm-btn--block" type="button" id="copy-image">Copiar imagen al portapapeles</button>
+        </div>
+        <p class="qm-hint" id="clipboard-hint">Los ficheros se guardan como <code>qr-magic.png</code>,
+          <code>qr-magic.svg</code> y <code>qr-magic.jpeg</code>.</p>
+        <p class="qm-hint" id="clipboard-note"></p>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<div class="qm-toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   qr-magic · Generador de códigos QR personalizados
+   Todo el código se ejecuta en el navegador. Ningún dato del
+   usuario sale del equipo: solo se cargan los dos CDN.
+   ─────────────────────────────────────────────────────────────
+   SECCIONES
+     1. Utilidades DOM
+     2. Estado
+     3. Payload (URL, Wi-Fi, vCard, Email)
+     4. Validación
+     5. Contraste (WCAG 2.1)
+     6. Plantillas (presets)
+     7. Iconos SVG
+     8. Opciones y render
+     9. Exportación
+    10. Eventos e inicialización
+   ═══════════════════════════════════════════════════════════════ */
+
+(function () {
+'use strict';
+
+/* ───────────────────────── 1. Utilidades DOM ───────────────────────── */
+
+const $  = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+
+function el(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') node.className = v;
+    else if (k === 'text') node.textContent = v;
+    else if (k === 'html') node.innerHTML = v;
+    else node.setAttribute(k, v);
+  }
+  for (const child of [].concat(children)) node.appendChild(child);
+  return node;
+}
+
+/** Codifica UTF-8 → cadena Latin-1 para que la librería qr-code-styling
+ *  (que usa `charCodeAt & 0xff`) genere los bytes UTF-8 exactos. */
+function encodePayloadForQr(text) {
+  const bytes = new TextEncoder().encode(text);
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) out += String.fromCharCode(bytes[i]);
+  return out;
+}
+
+/** SVG → data URI base64 con soporte UTF-8. */
+function svgToDataUri(svg) {
+  const bytes = new TextEncoder().encode(svg);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return 'data:image/svg+xml;base64,' + btoa(bin);
+}
+
+/* ───────────────────────────── 2. Estado ───────────────────────────── */
+
+const PREVIEW_SIZE = 320;
+const DEFAULT_URL = 'https://qr-magic.app';
+
+const state = {
+  activeTab: 'url',
+  content: {
+    url:   { text: DEFAULT_URL },
+    wifi:  { ssid: '', password: '', encryption: 'WPA', hidden: false },
+    vcard: { firstName: '', lastName: '', phone: '', email: '', org: '', title: '', website: '' },
+    email: { to: '', subject: '', body: '' }
+  },
+  dots: {
+    type: 'rounded', mode: 'solid', color: '#4f46e5',
+    color1: '#4f46e5', color2: '#a855f7', gradientType: 'linear', angle: 45
+  },
+  cornersSquare: { type: 'extra-rounded', color: '#4f46e5' },
+  cornersDot:    { type: 'dot', color: '#a855f7' },
+  background: { color: '#ffffff', transparent: false },
+  logo: { image: null, name: '', kind: '', source: 'none', iconId: '', sizePercent: 25, margin: 0, errorCorrection: 'Q', ecAuto: false },
+  export: { size: 1000 }
+};
+
+function getState(path) {
+  return path.split('.').reduce((obj, key) => (obj == null ? obj : obj[key]), state);
+}
+
+function setState(path, value) {
+  const parts = path.split('.');
+  let obj = state;
+  for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+  const key = parts[parts.length - 1];
+  obj[key] = value;
+
+  // Un logo obliga a la corrección de errores H para que siga siendo legible.
+  if (path === 'logo.image' && value) {
+    state.logo.errorCorrection = 'H';
+    state.logo.ecAuto = true;
+  }
+}
+
+/* ─────────────────── 3. Payload (URL, Wi-Fi, vCard, Email) ─────────────────── */
+
+function buildUrlPayload(texto) {
+  return String(texto || '').trim();
+}
+
+/** Escapa \ ; , : " con backslash (formato Wi-Fi). */
+function escapeWifiValue(value) {
+  return String(value == null ? '' : value).replace(/([\\;,:"])/g, '\\$1');
+}
+
+/** Escapa , ; \ y saltos de línea con backslash (formato vCard). */
+function escapeVCardValue(value) {
+  return String(value == null ? '' : value)
+    .replace(/\\/g, '\\\\')
+    .replace(/\r\n|\r|\n/g, '\\n')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;');
+}
+
+function buildWifiPayload({ ssid, password, encryption, hidden }) {
+  const type = encryption === 'WEP' ? 'WEP' : encryption === 'nopass' ? 'nopass' : 'WPA';
+  const parts = ['T:' + type, 'S:' + escapeWifiValue(String(ssid || '').trim())];
+  if (type !== 'nopass' && password) parts.push('P:' + escapeWifiValue(password));
+  if (hidden) parts.push('H:true');
+  return 'WIFI:' + parts.join(';') + ';;';
+}
+
+function buildVCardPayload(v) {
+  const first = String(v.firstName || '').trim();
+  const last  = String(v.lastName || '').trim();
+  const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
+
+  if (last || first) lines.push('N:' + escapeVCardValue(last) + ';' + escapeVCardValue(first));
+  const fullName = [first, last].filter(Boolean).join(' ');
+  if (fullName) lines.push('FN:' + escapeVCardValue(fullName));
+  if (String(v.org || '').trim())   lines.push('ORG:' + escapeVCardValue(v.org.trim()));
+  if (String(v.title || '').trim()) lines.push('TITLE:' + escapeVCardValue(v.title.trim()));
+  if (String(v.phone || '').trim()) lines.push('TEL;TYPE=CELL:' + v.phone.trim());
+  if (String(v.email || '').trim()) lines.push('EMAIL:' + v.email.trim());
+  if (String(v.website || '').trim()) lines.push('URL:' + v.website.trim());
+
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+
+function buildEmailPayload({ to, subject, body }) {
+  const destino = String(to || '').trim();
+  const params = [];
+  if (String(subject || '').trim()) params.push('subject=' + encodeURIComponent(subject.trim()));
+  if (String(body || '').trim())    params.push('body=' + encodeURIComponent(body.trim()));
+  return 'mailto:' + destino + (params.length ? '?' + params.join('&') : '');
+}
+
+/* ───────────────────────────── 4. Validación ───────────────────────────── */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Mapa clave de error → elemento de formulario afectado. */
+const FIELD_ERRORS = {
+  'url.text':        { input: 'url-text',    error: 'url-text-error' },
+  'wifi.ssid':       { input: 'wifi-ssid',   error: 'wifi-ssid-error' },
+  'wifi.password':   { input: 'wifi-password', error: 'wifi-password-error' },
+  'vcard.firstName': { input: 'vcard-first', error: 'vcard-first-error' },
+  'email.to':        { input: 'email-to',    error: 'email-to-error' }
+};
+
+function validateContent(tab) {
+  const errors = {};
+  if (tab === 'url') {
+    if (!state.content.url.text.trim()) {
+      errors['url.text'] = 'Escribe un enlace o un texto para qr-magic.';
+    }
+  }
+  if (tab === 'wifi') {
+    if (!state.content.wifi.ssid.trim()) {
+      errors['wifi.ssid'] = 'El nombre de la red (SSID) es obligatorio.';
+    }
+    if (state.content.wifi.encryption !== 'nopass' && !state.content.wifi.password) {
+      errors['wifi.password'] = 'La contraseña es obligatoria para redes WPA/WPA2 y WEP.';
+    }
+  }
+  if (tab === 'vcard') {
+    const v = state.content.vcard;
+    if (!v.firstName.trim() && !v.lastName.trim() && !v.email.trim()) {
+      errors['vcard.firstName'] = 'Indica al menos un nombre o un correo electrónico.';
+    }
+  }
+  if (tab === 'email') {
+    const to = state.content.email.to.trim();
+    if (!to) {
+      errors['email.to'] = 'El destinatario es obligatorio.';
+    } else if (!EMAIL_RE.test(to)) {
+      errors['email.to'] = 'Introduce un correo electrónico válido.';
+    }
+  }
+  return errors;
+}
+
+/** Refleja los errores de validación en los campos y devuelve el primero. */
+function applyValidation(errors) {
+  for (const key of Object.keys(FIELD_ERRORS)) {
+    const map = FIELD_ERRORS[key];
+    const input = document.getElementById(map.input);
+    const node  = document.getElementById(map.error);
+    if (!input || !node) continue;
+    const message = errors[key];
+    node.textContent = message || '';
+    node.hidden = !message;
+    if (message) input.setAttribute('aria-invalid', 'true');
+    else input.removeAttribute('aria-invalid');
+  }
+  const keys = Object.keys(errors);
+  return keys.length ? errors[keys[0]] : null;
+}
+
+/* ─────────────────────── 5. Contraste (WCAG 2.1) ─────────────────────── */
+
+function hexToRgb(hex) {
+  let h = String(hex || '').trim().replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function relativeLuminance(rgb) {
+  const lin = [rgb.r, rgb.g, rgb.b].map(v => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+}
+
+function contrastRatio(rgbA, rgbB) {
+  const la = relativeLuminance(rgbA);
+  const lb = relativeLuminance(rgbB);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/** Colores de módulos de datos y zonas de esquina, incluidos puntos intermedios del degradado. */
+function qrContrastColors() {
+  const colors = [];
+  if (state.dots.mode === 'gradient') {
+    const start = hexToRgb(state.dots.color1);
+    const end = hexToRgb(state.dots.color2);
+    if (start && end) {
+      for (let i = 0; i <= 100; i++) {
+        const t = i / 100;
+        colors.push({
+          r: Math.round(start.r + (end.r - start.r) * t),
+          g: Math.round(start.g + (end.g - start.g) * t),
+          b: Math.round(start.b + (end.b - start.b) * t)
+        });
+      }
+    }
+  } else {
+    colors.push(hexToRgb(state.dots.color));
+  }
+  colors.push(hexToRgb(state.cornersSquare.color), hexToRgb(state.cornersDot.color));
+  return colors.filter(Boolean);
+}
+
+/** Fondo efectivo: blanco cuando el fondo es transparente. */
+function effectiveBackground() {
+  return state.background.transparent ? { r: 255, g: 255, b: 255 } : hexToRgb(state.background.color);
+}
+
+/** Estimación del peor contraste entre módulos de datos, esquinas y fondo efectivo. */
+function computeContrast() {
+  const bg = effectiveBackground();
+  const colors = qrContrastColors();
+  if (!bg || !colors.length) return { ratio: 21, unknown: true };
+
+  let ratio = Infinity;
+  for (const color of colors) ratio = Math.min(ratio, contrastRatio(color, bg));
+  return { ratio, unknown: false };
+}
+
+function contrastStatus(ratio) {
+  if (ratio >= 7)   return { label: 'Excelente',      badge: 'qm-badge--ok' };
+  if (ratio >= 4.5) return { label: 'Bueno',          badge: 'qm-badge--ok' };
+  if (ratio >= 3)   return { label: 'Bajo',            badge: 'qm-badge--warn' };
+  return { label: 'Contraste bajo', badge: 'qm-badge--error' };
+}
+
+function formatRatio(ratio) {
+  const rounded = Math.round(ratio * 100) / 100;
+  return (Number.isInteger(rounded) ? rounded : rounded.toFixed(2)) + ':1';
+}
+
+/* ─────────────────────────── 6. Plantillas (presets) ─────────────────────────── */
+
+const PRESETS = [
+  {
+    id: 'clasico',
+    nombre: 'Clásico',
+    descripcion: 'Negro sobre blanco',
+    swatch: 'linear-gradient(135deg,#000 0%,#000 50%,#fff 50%,#fff 100%)',
+    opciones: {
+      dots: { type: 'square', mode: 'solid', color: '#000000' },
+      cornersSquare: { type: 'square', color: '#000000' },
+      cornersDot: { type: 'square', color: '#000000' },
+      background: { color: '#ffffff', transparent: false }
+    }
+  },
+  {
+    id: 'moderno-azul',
+    nombre: 'Moderno Azul',
+    descripcion: 'Degradado índigo a azul',
+    swatch: 'linear-gradient(135deg,#4f46e5 0%,#2563eb 100%)',
+    opciones: {
+      dots: { type: 'rounded', mode: 'gradient', color1: '#4f46e5', color2: '#2563eb', gradientType: 'linear', angle: 45 },
+      cornersSquare: { type: 'extra-rounded', color: '#4f46e5' },
+      cornersDot: { type: 'dot', color: '#2563eb' },
+      background: { color: '#ffffff', transparent: false }
+    }
+  },
+  {
+    id: 'neon-oscuro',
+    nombre: 'Neón Oscuro',
+    descripcion: 'Cian sobre fondo noche',
+    swatch: 'linear-gradient(135deg,#0f172a 0%,#0f172a 45%,#22d3ee 45%,#22d3ee 70%,#a855f7 70%)',
+    opciones: {
+      dots: { type: 'dots', mode: 'solid', color: '#22d3ee' },
+      cornersSquare: { type: 'dot', color: '#a855f7' },
+      cornersDot: { type: 'dot', color: '#f472b6' },
+      background: { color: '#0f172a', transparent: false }
+    }
+  },
+  {
+    id: 'elegante-dorado',
+    nombre: 'Elegante Dorado',
+    descripcion: 'Dorado sobre crema',
+    swatch: 'linear-gradient(135deg,#fffdf7 0%,#fffdf7 50%,#c9a227 50%,#c9a227 100%)',
+    opciones: {
+      dots: { type: 'classy-rounded', mode: 'solid', color: '#c9a227' },
+      cornersSquare: { type: 'extra-rounded', color: '#c9a227' },
+      cornersDot: { type: 'square', color: '#c9a227' },
+      background: { color: '#fffdf7', transparent: false }
+    }
+  },
+  {
+    id: 'minimalista',
+    nombre: 'Minimalista',
+    descripcion: 'Grafito sobre blanco',
+    swatch: 'linear-gradient(135deg,#fff 0%,#fff 50%,#111827 50%,#111827 100%)',
+    opciones: {
+      dots: { type: 'square', mode: 'solid', color: '#111827' },
+      cornersSquare: { type: 'square', color: '#111827' },
+      cornersDot: { type: 'dot', color: '#111827' },
+      background: { color: '#ffffff', transparent: false }
+    }
+  }
+];
+
+function applyPreset(preset) {
+  for (const [section, values] of Object.entries(preset.opciones)) {
+    Object.assign(state[section], values);
+  }
+  syncControlsFromState();
+  render();
+}
+
+/* ─────────────────────────── 7. Iconos SVG ─────────────────────────── */
+
+const ICONS = [
+  { id: 'wifi', nombre: 'Wi-Fi', color: '#0ea5e9', path:
+    '<path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>' },
+  { id: 'pin', nombre: 'Ubicación', color: '#ef4444', path:
+    '<path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 0 1 0-5 2.5 2.5 0 0 1 0 5z"/>' },
+  { id: 'star', nombre: 'Estrella', color: '#f59e0b', path:
+    '<path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>' },
+  { id: 'heart', nombre: 'Corazón', color: '#ec4899', path:
+    '<path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>' },
+  { id: 'link', nombre: 'Enlace', color: '#4f46e5', path:
+    '<path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>' },
+  { id: 'mail', nombre: 'Email', color: '#6366f1', path:
+    '<path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>' },
+  { id: 'phone', nombre: 'Teléfono', color: '#10b981', path:
+    '<path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>' },
+  { id: 'person', nombre: 'Usuario', color: '#8b5cf6', path:
+    '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>' },
+  { id: 'event', nombre: 'Calendario', color: '#f97316', path:
+    '<path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/>' },
+  { id: 'chat', nombre: 'Mensaje', color: '#3b82f6', path:
+    '<path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>' },
+  { id: 'restaurant', nombre: 'Restaurante', color: '#14b8a6', path:
+    '<path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/>' }
+];
+
+/** Icono con fondo blanco redondeado, listo para incrustar en el QR. */
+function iconAsDataUri(icon) {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">' +
+    '<rect width="24" height="24" rx="5" fill="#ffffff"/>' +
+    '<g fill="' + icon.color + '">' + icon.path + '</g>' +
+    '</svg>';
+  return svgToDataUri(svg);
+}
+
+/* ─────────────────────── 8. Opciones y render ─────────────────────── */
+
+let preview = null;
+let renderTimer = null;
+
+/** Traduce el estado al objeto de opciones de qr-code-styling. */
+function buildOptions(payload, type, size) {
+  const s = state;
+  const options = {
+    type: type || 'svg',
+    width: size || PREVIEW_SIZE,
+    height: size || PREVIEW_SIZE,
+    margin: 8,
+    data: payload,
+    dotsOptions: { type: s.dots.type },
+    cornersSquareOptions: { type: s.cornersSquare.type, color: s.cornersSquare.color },
+    cornersDotOptions: { type: s.cornersDot.type, color: s.cornersDot.color },
+    backgroundOptions: { color: s.background.transparent ? 'transparent' : s.background.color },
+    qrOptions: { errorCorrectionLevel: s.logo.errorCorrection, typeNumber: 0 },
+    imageOptions: {
+      imageSize: s.logo.sizePercent / 100,
+      margin: s.logo.margin,
+      hideBackgroundDots: true,
+      saveAsBlob: true
+    }
+  };
+
+  if (s.dots.mode === 'gradient') {
+    options.dotsOptions.gradient = {
+      type: s.dots.gradientType,
+      rotation: (s.dots.angle * Math.PI) / 180,
+      colorStops: [
+        { offset: 0, color: s.dots.color1 },
+        { offset: 1, color: s.dots.color2 }
+      ]
+    };
+  } else {
+    options.dotsOptions.color = s.dots.color;
+  }
+
+  if (s.logo.image) options.image = s.logo.image;
+
+  return options;
+}
+
+/** Payload de la pestaña activa (ya validado). */
+function buildPayloadFor(tab) {
+  switch (tab) {
+    case 'url':   return buildUrlPayload(state.content.url.text);
+    case 'wifi':  return buildWifiPayload(state.content.wifi);
+    case 'vcard': return buildVCardPayload(state.content.vcard);
+    case 'email': return buildEmailPayload(state.content.email);
+    default:      return '';
+  }
+}
+
+function showEmptyState(message) {
+  const previewEl = $('#qr-preview');
+  previewEl.innerHTML = '';
+  previewEl.appendChild(el('div', { class: 'qm-empty' }, [
+    el('div', { class: 'qm-empty__icon', 'aria-hidden': 'true', text: '🔍' }),
+    el('p', { text: message })
+  ]));
+}
+
+/** Flujo principal de renderizado. */
+function render() {
+  const errors = validateContent(state.activeTab);
+  const firstError = applyValidation(errors);
+  const previewEl = $('#qr-preview');
+  const dumpEl = $('#payload-dump');
+  const errorEl = $('#render-error');
+
+  if (firstError) {
+    showEmptyState(firstError);
+    dumpEl.textContent = '';
+    errorEl.hidden = true;
+    updateContrastIndicator();
+    return;
+  }
+
+  const payload = buildPayloadFor(state.activeTab);
+  dumpEl.textContent = payload;
+
+  try {
+    const options = buildOptions(encodePayloadForQr(payload), 'svg', PREVIEW_SIZE);
+    if (!preview) {
+      preview = new QRCodeStyling(options);
+      preview.append(previewEl);
+    } else {
+      preview.update(options);
+    }
+    errorEl.hidden = true;
+  } catch (err) {
+    previewEl.innerHTML = '';
+    errorEl.hidden = false;
+    $('#render-error-text').textContent =
+      'No se ha podido generar el código QR: ' +
+      (err && err.message ? err.message : 'revisa el contenido introducido.');
+  }
+
+  updateContrastIndicator();
+}
+
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(render, 150);
+}
+
+function updateContrastIndicator() {
+  const badge = $('#contrast-badge');
+  const ratioEl = $('#contrast-ratio');
+  const warn = $('#contrast-warning');
+  const transparentHint = $('#transparent-hint');
+  const { ratio } = computeContrast();
+  const status = contrastStatus(ratio);
+
+  badge.className = 'qm-badge ' + status.badge;
+  badge.textContent = status.label;
+  ratioEl.textContent = 'Contraste orientativo ' + formatRatio(ratio);
+  warn.hidden = !(ratio < 4.5);
+  warn.classList.toggle('qm-alert--warn', ratio >= 3);
+  warn.classList.toggle('qm-alert--error', ratio < 3);
+  transparentHint.hidden = !state.background.transparent;
+}
+
+/** Refleja el estado en todos los controles (tras presets, cargas, etc.). */
+function syncControlsFromState() {
+  $$('[data-bind]').forEach(control => {
+    const value = getState(control.dataset.bind);
+    if (control.type === 'checkbox') control.checked = !!value;
+    else if (control.type === 'radio') control.checked = control.value === String(value);
+    else control.value = value == null ? '' : value;
+  });
+  syncDependentControls();
+}
+
+/** Actualiza solo los controles que dependen del estado (sin tocar los valores). */
+function syncDependentControls() {
+  $('#dots-solid-block').hidden = state.dots.mode !== 'solid';
+  $('#dots-gradient-block').hidden = state.dots.mode !== 'gradient';
+  $('#bg-color').disabled = state.background.transparent;
+  $('#dots-angle-value').textContent = state.dots.angle + '°';
+  $('#logo-size-value').textContent = state.logo.sizePercent + ' %';
+  $('#logo-margin-value').textContent = state.logo.margin + ' px';
+  $('#logo-ec-warning').hidden = !(state.logo.image && state.logo.errorCorrection !== 'H');
+  updateLogoPanel();
+}
+
+function updateLogoPanel() {
+  const active = $('#logo-active');
+  const thumb = $('#logo-thumb');
+  if (!state.logo.image) {
+    active.hidden = true;
+    thumb.innerHTML = '';
+    return;
+  }
+  active.hidden = false;
+  thumb.innerHTML = '';
+  thumb.appendChild(el('img', { src: state.logo.image, alt: 'Logo activo' }));
+  $('#logo-name').textContent = state.logo.name || 'Logo';
+  $('#logo-kind').textContent = state.logo.kind || '';
+}
+
+function updateIconGallerySelection() {
+  $$('#icon-gallery .qm-iconbtn').forEach((btn, index) => {
+    btn.setAttribute('aria-pressed', String(ICONS[index].id === state.logo.iconId));
+  });
+}
+
+/** Renderiza las plantillas rápidas. */
+function renderPresets() {
+  const container = $('#presets');
+  container.innerHTML = '';
+  PRESETS.forEach(preset => {
+    const btn = el('button', { type: 'button', class: 'qm-preset' });
+    btn.appendChild(el('span', { class: 'qm-preset__swatch', style: 'background:' + preset.swatch }));
+    btn.appendChild(el('span', { class: 'qm-preset__name', text: preset.nombre }));
+    btn.appendChild(el('span', { class: 'qm-preset__desc', text: preset.descripcion }));
+    btn.addEventListener('click', () => {
+      applyPreset(preset);
+      announce('Plantilla «' + preset.nombre + '» aplicada.', 'ok');
+    });
+    container.appendChild(btn);
+  });
+}
+
+/** Renderiza la galería de iconos SVG. */
+function renderIconGallery() {
+  const container = $('#icon-gallery');
+  container.innerHTML = '';
+  ICONS.forEach(icon => {
+    const btn = el('button', {
+      type: 'button', class: 'qm-iconbtn', 'aria-pressed': 'false',
+      title: icon.nombre, 'aria-label': 'Usar el icono ' + icon.nombre
+    });
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="' + icon.color + '" aria-hidden="true">' + icon.path + '</svg>';
+    btn.addEventListener('click', () => selectIcon(icon));
+    container.appendChild(btn);
+  });
+}
+
+function selectIcon(icon) {
+  setState('logo.image', iconAsDataUri(icon));
+  setState('logo.name', icon.nombre);
+  setState('logo.kind', 'Icono SVG integrado');
+  setState('logo.source', 'icon');
+  setState('logo.iconId', icon.id);
+  updateIconGallerySelection();
+  syncControlsFromState();
+  render();
+  announce('Icono «' + icon.nombre + '» aplicado como logo.', 'ok');
+}
+
+/** Aviso temporal en la esquina inferior. */
+function announce(message, kind) {
+  const box = $('#toasts');
+  const toast = el('div', { class: 'qm-toast' + (kind ? ' qm-toast--' + kind : '') }, [
+    el('span', { text: message })
+  ]);
+  box.appendChild(toast);
+  setTimeout(() => toast.remove(), 3600);
+}
+
+/* ─────────────────────── 9. Logo, exportación y eventos ─────────────────────── */
+
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml'];
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function showLogoError(message) {
+  const node = $('#logo-error');
+  node.textContent = message;
+  node.hidden = false;
+}
+
+function clearLogoError() {
+  const node = $('#logo-error');
+  node.textContent = '';
+  node.hidden = true;
+}
+
+function handleLogoFile(file) {
+  if (!file) return;
+  clearLogoError();
+
+  if (ALLOWED_LOGO_TYPES.indexOf(file.type) === -1) {
+    showLogoError('Formato no admitido. Usa una imagen PNG, JPG o SVG.');
+    return;
+  }
+  if (file.size > MAX_LOGO_BYTES) {
+    showLogoError('El fichero es demasiado grande. El máximo admitido es 2 MB.');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    setState('logo.image', reader.result);
+    setState('logo.name', file.name);
+    setState('logo.kind', 'Imagen local · ' + formatBytes(file.size));
+    setState('logo.source', 'upload');
+    setState('logo.iconId', '');
+    updateIconGallerySelection();
+    syncControlsFromState();
+    render();
+    announce('Logo «' + file.name + '» aplicado.', 'ok');
+  };
+  reader.onerror = () => showLogoError('No se ha podido leer el fichero seleccionado.');
+  reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+  // Si el nivel H fue el que activamos nosotros al añadir el logo (y el
+  // usuario no lo eligió a mano), se restaura el nivel por defecto.
+  if (state.logo.ecAuto && state.logo.errorCorrection === 'H') {
+    state.logo.errorCorrection = 'Q';
+    state.logo.ecAuto = false;
+  }
+  setState('logo.image', null);
+  setState('logo.name', '');
+  setState('logo.kind', '');
+  setState('logo.source', 'none');
+  setState('logo.iconId', '');
+  updateIconGallerySelection();
+  syncControlsFromState();
+  render();
+  announce('Logo eliminado.', 'ok');
+}
+
+function initLogo() {
+  const zone = $('#dropzone');
+  const input = $('#logo-file');
+
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+  });
+  input.addEventListener('change', () => {
+    handleLogoFile(input.files && input.files[0]);
+    input.value = '';
+  });
+
+  ['dragenter', 'dragover'].forEach(type => {
+    zone.addEventListener(type, e => { e.preventDefault(); zone.classList.add('qm-dropzone--over'); });
+  });
+  ['dragleave', 'drop'].forEach(type => {
+    zone.addEventListener(type, e => { e.preventDefault(); zone.classList.remove('qm-dropzone--over'); });
+  });
+  zone.addEventListener('drop', e => {
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    handleLogoFile(file);
+  });
+
+  $('#logo-remove').addEventListener('click', removeLogo);
+}
+
+/* ── Pestañas ── */
+
+function selectTab(name) {
+  state.activeTab = name;
+  $$('.qm-tab').forEach(tab => {
+    const active = tab.dataset.tab === name;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+  });
+  $$('[data-panel]').forEach(panel => {
+    panel.hidden = panel.dataset.panel !== name;
+  });
+  render();
+}
+
+function initTabs() {
+  const tabs = $$('.qm-tab');
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => selectTab(tab.dataset.tab));
+    tab.addEventListener('keydown', e => {
+      let target = null;
+      if (e.key === 'ArrowRight') target = tabs[(index + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft') target = tabs[(index - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home') target = tabs[0];
+      else if (e.key === 'End') target = tabs[tabs.length - 1];
+      if (target) {
+        e.preventDefault();
+        target.focus();
+        selectTab(target.dataset.tab);
+      }
+    });
+  });
+}
+
+/* ── Exportación ── */
+
+function createExportInstance(size, extraOptions) {
+  const errors = validateContent(state.activeTab);
+  const firstError = applyValidation(errors);
+  if (firstError) throw new Error(firstError);
+  const payload = buildPayloadFor(state.activeTab);
+  const options = buildOptions(encodePayloadForQr(payload), 'canvas', size);
+  if (extraOptions && extraOptions.backgroundOptions) {
+    options.backgroundOptions = Object.assign({}, options.backgroundOptions, extraOptions.backgroundOptions);
+  }
+  return new QRCodeStyling(options);
+}
+
+async function exportBlob(extension, extraOptions) {
+  const instance = createExportInstance(state.export.size, extraOptions);
+  return instance.getRawData(extension);
+}
+
+async function downloadFile(extension, extraOptions) {
+  const blob = await exportBlob(extension, extraOptions);
+  const url = URL.createObjectURL(blob);
+  const link = el('a', { href: url, download: 'qr-magic.' + extension });
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  return blob;
+}
+
+function clipboardAvailable() {
+  return !!(navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined');
+}
+
+async function copyImageToClipboard() {
+  if (!clipboardAvailable()) {
+    announce('El portapapeles no está disponible aquí. Descarga el PNG y cópialo manualmente.', 'error');
+    return;
+  }
+  try {
+    const blob = await exportBlob('png');
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    announce('Imagen del QR copiada al portapapeles.', 'ok');
+  } catch (err) {
+    announce('No se ha podido copiar la imagen. Descarga el PNG manualmente como alternativa.', 'error');
+  }
+}
+
+async function guardExport(action) {
+  const errors = validateContent(state.activeTab);
+  const firstError = applyValidation(errors);
+  if (firstError) {
+    announce(firstError, 'error');
+    return;
+  }
+  try {
+    await action();
+  } catch (err) {
+    announce('No se ha podido exportar el QR: ' +
+      (err && err.message ? err.message : 'se ha producido un error inesperado.'), 'error');
+  }
+}
+
+function initExport() {
+  $('#download-png').addEventListener('click', () => guardExport(async () => {
+    await downloadFile('png');
+    announce('qr-magic.png descargado.', 'ok');
+  }));
+
+  $('#download-svg').addEventListener('click', () => guardExport(async () => {
+    await downloadFile('svg');
+    announce('qr-magic.svg descargado.', 'ok');
+  }));
+
+  $('#download-jpeg').addEventListener('click', () => guardExport(async () => {
+    const transparent = state.background.transparent;
+    await downloadFile('jpeg', transparent ? { backgroundOptions: { color: '#ffffff' } } : null);
+    announce(transparent
+      ? 'qr-magic.jpeg descargado con fondo blanco: JPEG no admite transparencia.'
+      : 'qr-magic.jpeg descargado.', 'ok');
+  }));
+
+  $('#copy-image').addEventListener('click', () => guardExport(copyImageToClipboard));
+
+  const btn = $('#copy-image');
+  const available = clipboardAvailable();
+  btn.disabled = !available;
+  btn.title = available
+    ? 'Copia la imagen del QR al portapapeles'
+    : 'Requiere abrir qr-magic mediante HTTPS o localhost';
+  $('#clipboard-note').textContent = available
+    ? ''
+    : 'Copiar al portapapeles requiere abrir qr-magic mediante HTTPS o localhost (no funciona con file://).';
+}
+
+/* ── Controles ── */
+
+function onControlEvent(event) {
+  const control = event.target.closest('[data-bind]');
+  if (!control) return;
+
+  let value;
+  if (control.type === 'checkbox') value = control.checked;
+  else if (control.type === 'radio') { if (!control.checked) return; value = control.value; }
+  else if (control.dataset.type === 'number') value = Number(control.value);
+  else value = control.value;
+
+  setState(control.dataset.bind, value);
+
+  // Si el usuario elige el nivel de corrección a mano, deja de ser "automático".
+  if (control.dataset.bind === 'logo.errorCorrection') state.logo.ecAuto = false;
+
+  if (control.type === 'text' || control.tagName === 'TEXTAREA') {
+    scheduleRender();
+    syncDependentControls();
+  } else {
+    syncDependentControls();
+    render();
+  }
+}
+
+function initControls() {
+  document.addEventListener('input', onControlEvent);
+  document.addEventListener('change', onControlEvent);
+}
+
+/* ─────────────────── 10. Inicialización ─────────────────── */
+
+function init() {
+  if (typeof QRCodeStyling === 'undefined') {
+    $('#library-error').hidden = false;
+    return;
+  }
+
+  renderPresets();
+  renderIconGallery();
+  initTabs();
+  initControls();
+  initLogo();
+  initExport();
+  syncControlsFromState();
+  render();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+})();
+</script>
+</body>
+</html>
