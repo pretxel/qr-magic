@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-T6FDLJ4F');</script>
+<!-- End Google Tag Manager -->
 <title>qr-magic — Generador de códigos QR personalizados</title>
 <meta name="description" content="qr-magic: genera códigos QR personalizados con degradados, esquinas a medida, logo central y fondo transparente. Todo en tu navegador, sin registro.">
 <meta name="theme-color" content="#4f46e5">
@@ -387,6 +394,10 @@
 </head>
 
 <body>
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-T6FDLJ4F"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
 <div class="qm-shell">
 
   <!-- ═══════════════ ENCABEZADO ═══════════════ -->
@@ -398,7 +409,7 @@
         <p class="qm-subtitle">Generador de códigos QR personalizados. Todo ocurre en tu navegador.</p>
       </div>
     </div>
-    <span class="qm-badge qm-badge--muted">100 % local · sin registro · sin servidor</span>
+    <span class="qm-badge qm-badge--muted">Tus datos no salen del navegador · sin registro</span>
   </header>
 
   <!-- Aviso: la librería no está disponible -->
@@ -801,7 +812,10 @@
 /* ═══════════════════════════════════════════════════════════════
    qr-magic · Generador de códigos QR personalizados
    Todo el código se ejecuta en el navegador. Ningún dato del
-   usuario sale del equipo: solo se cargan los dos CDN.
+   usuario (contenido del QR, logo) sale del equipo. Además de los
+   dos CDN se carga Google Tag Manager (GTM-T6FDLJ4F) solo para
+   medir visitas: la app NUNCA hace dataLayer.push con datos del
+   formulario.
    ─────────────────────────────────────────────────────────────
    SECCIONES
      1. Utilidades DOM
